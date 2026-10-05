@@ -1,0 +1,74 @@
+{
+  "progress": {
+    "box_iou": "ok",
+    "nms": "ok",
+    "batched_nms": "ok",
+    "average_precision": "ok",
+    "mask_iou": "ok",
+    "polygon_to_mask": "ok",
+    "mask_to_yolo_seg": "ok",
+    "autolabel": "ok",
+    "oks": "ok",
+    "joint_angle": "ok",
+    "FLIP_IDX": "ok"
+  },
+  "latency": [
+    {
+      "Cấu hình": "one-to-many + NMS, conf 0.25",
+      "preprocess (ms)": 1.67,
+      "inference (ms)": 9.44,
+      "postprocess (ms)": 1.23,
+      "số box": 5
+    },
+    {
+      "Cấu hình": "one-to-many + NMS, conf 0.001",
+      "preprocess (ms)": 2.34,
+      "inference (ms)": 12.44,
+      "postprocess (ms)": 1.72,
+      "số box": 203
+    },
+    {
+      "Cấu hình": "one-to-one NMS-free, conf 0.25",
+      "preprocess (ms)": 2.56,
+      "inference (ms)": 11.85,
+      "postprocess (ms)": 0.53,
+      "số box": 5
+    },
+    {
+      "Cấu hình": "one-to-one NMS-free, conf 0.001",
+      "preprocess (ms)": 2.65,
+      "inference (ms)": 12.72,
+      "postprocess (ms)": 0.54,
+      "số box": 204
+    }
+  ],
+  "result_4b": {
+    "flip_idx": "giải phẫu",
+    "epochs": 40,
+    "imgsz": 640,
+    "Box mAP50-95": 0.9303488492063492,
+    "Pose mAP50": 0.995,
+    "Pose mAP50-95": 0.4573462529843696,
+    "train (phút)": 4.4
+  },
+  "result_4c": null,
+  "answers": {
+    "Q1": "(a) bus.jpg sau letterbox có kích thước 640×480 nên số vị trí dự đoán là 80×60 + 40×30 + 20×15 = 6300, ít hơn 8400 của ảnh 640×640 vì số ô ở cả ba feature map đều giảm theo chiều cao.\n(b) Nếu mọi box lệch sang phải và xuống dưới đúng nửa kích thước, nhãn gốc là xywh với (x, y) là góc trên-trái nhưng đã bị đọc nhầm như cxcywh với (x, y) là tâm. Khi giải mã như tâm, ta cộng/trừ nửa w,h quanh một điểm vốn đã là góc trên-trái nên box bị dịch.",
+    "Q2": "Trong bảng lần chạy của tôi, chênh lệch lớn nhất giữa hai head nằm ở cột inference tại conf=0.25: one-to-many + NMS là 9.44 ms còn one-to-one NMS-free là 11.85 ms. Lợi ích NMS-free rõ hơn khi conf thấp vì có nhiều candidate đi vào hậu xử lý; cảnh đông cũng tạo nhiều box chồng lặp nên NMS tốn thêm phép so sánh. Trên CPU/NPU, hậu xử lý NMS thường kém song song hơn inference tensor nên phần tiết kiệm này càng đáng kể.",
+    "Q3": "(a) IoU 0.75 lớn hơn ngưỡng 0.7 nên NMS sẽ giữ box có score cao hơn và loại box còn lại, dù đó có thể là hai công nhân thật sự khác nhau. Tăng ngưỡng giúp giữ các object đứng sát nhau nhưng dễ giữ duplicate; giảm ngưỡng loại duplicate mạnh hơn nhưng tăng nguy cơ bỏ sót trong cảnh đông.\n(b) Head one-to-one phù hợp inference vì mỗi object chỉ có một dự đoán nên không cần NMS, nhưng one-to-many cho nhiều positive assignment hơn trong lúc train, tạo tín hiệu học dày và giúp backbone/neck học ổn định, recall tốt hơn. Vì vậy YOLO26 vẫn train song song head one-to-many dù khi suy luận có thể dùng head one-to-one.",
+    "Q4": "(a) Lần chạy này semantic segmentation tạo 8 vùng liên thông cho class person trong khi ảnh thực tế có 4 người. Có thể đếm thiếu khi hai người chạm nhau và bị nối thành một vùng, hoặc đếm thừa khi một người bị mask đứt thành nhiều mảnh/nhiễu; panoptic segmentation gắn instance ID cho từng 'thing' nên vừa có class pixel vừa tách từng cá thể.\n(b) Trong box xe buýt, class chiếm nhiều pixel nhất là train (63% ở lần chạy này). Đây là lỗi nhận dạng của model semantic pretrained: hình dạng/texture của xe buýt trong ảnh gần với các mẫu class đó và semantic model không dùng box detector để ép class bus.",
+    "Q5": "(a) YOLO26-seg tạo mask từ các prototype dùng chung ở mức ảnh nên object nhỏ/thin chỉ chiếm ít phần tử trên feature map và biên dễ thô. Mask R-CNN dự đoán mask cố định 28×28 trong từng RoI; khi object rất lớn, lưới 28×28 phải phóng lên một vùng lớn nên biên có thể bị răng cưa/thô theo độ phân giải RoI.\n(b) Ghép tham lam 'mỗi mask YOLO lấy mask Mask R-CNN có IoU cao nhất' có thể cho nhiều mask YOLO cùng chọn một mask Mask R-CNN, làm mất ràng buộc một-một và tổng ghép không tối ưu. Hungarian matching xét toàn bộ ma trận IoU và tìm phép gán một-một tối đa tổng IoU.",
+    "Q6": "(a) Điểm A tạo mask 47441 pixel với IoU tốt nhất 0.99 so với mask từ box, còn điểm B tạo mask 2714 pixel với IoU 0.00; cùng nằm trong một box nhưng prompt điểm có thể rơi vào bộ phận/miền cục bộ khác nên SAM hiểu object khác nhau. Prompt box an toàn hơn cho auto-label vì nó cung cấp cả vùng không gian của instance, giảm mơ hồ so với một positive point.\n(b) Dùng SAM trực tiếp khi cần segmentation linh hoạt theo prompt, số ảnh/instance ít và chấp nhận model nặng/latency cao. Với deployment lặp đi lặp lại trên class cố định, nên dùng SAM để tạo và sửa nhãn offline rồi fine-tune YOLO26-seg nhỏ để inference nhanh, rẻ và ổn định hơn.",
+    "Q7": "Khi bỏ ngưỡng bằng KP_THR=-100, Keypoint R-CNN vẫn buộc phải chọn một cực đại heatmap cho các khớp chân dù chúng nằm ngoài khung; lần chạy này cho người 0: left_knee≈(712,700), right_knee≈(712,700), left_ankle≈(712,700), right_ankle≈(812,700) | người 1: left_knee≈(846,710), right_knee≈(846,710), left_ankle≈(849,710), right_ankle≈(847,710). Argmax luôn trả về một tọa độ cực đại, kể cả khi heatmap không có bằng chứng tốt cho keypoint thật, nên 'có tọa độ' không đồng nghĩa 'điểm hợp lệ'. Vì vậy phải dùng keypoint score/logit để loại các điểm không đủ tin cậy trước khi tính góc hay ra quyết định.",
+    "Q8": "Trên đồ thị, người 40×80 rơi xuống dưới OKS 0.5 vào khoảng 8 px (6 px vẫn trên 0.5, 8 px đã dưới). Với người 250×500, đường cong vẫn còn trên 0.5 tới hết miền 0–30 px của đồ thị, tức ngưỡng rơi dưới 0.5 lớn hơn 30 px.\nSigma của mắt nhỏ hơn hông vì vị trí mắt được người gán nhãn thống nhất/chính xác hơn, nên cùng sai số pixel bị phạt mạnh hơn; hông mơ hồ hơn nên sigma lớn và khoan dung hơn. Với camera cao nơi người chỉ khoảng 80 px, vài pixel sai số đã chiếm tỉ lệ lớn của cơ thể và làm OKS giảm mạnh, đặc biệt ở keypoint có sigma nhỏ.",
+    "Q9": "(a) Luật thân nghiêng >60° có thể báo nhầm khi người cúi sâu, bò, ngồi/ngả người hoặc camera bị nghiêng; nó có thể bỏ sót khi người ngã theo hướng phối cảnh khiến thân vẫn gần thẳng đứng trên ảnh, hoặc vai/hông bị che và confidence thấp nên hệ thống không kết luận.\n(b) Lần chạy này ảnh gốc phát hiện 5 người còn ảnh xoay chỉ 3. Rotation 90° tạo phân bố tư thế/hướng ảnh khác dữ liệu train, đồng thời crop/biên ảnh và hình học cơ thể thay đổi nên detector-pose mất một số instance.\n(c) Hệ thống thật cần tracking theo thời gian, temporal smoothing/event duration, kiểm tra vận tốc/chuyển trạng thái đứng→nằm, xử lý occlusion và confidence, calibration/góc camera, vùng quan tâm, cùng cơ chế cảnh báo/HITL để giảm false alarm.",
+    "Q10": "Train có 210 hổ quay phải và 0 quay trái; val có 53 quay phải và 0 quay trái. Vì val chỉ chứa cùng một hướng, flip_idx đồng nhất có thể vẫn cho mAP val khá cao và không làm lỗi lộ rõ, dù augmentation lật ngang đã tạo nhiễu nhãn trái/phải trong train.\nBug trở nên rõ khi triển khai gặp hổ quay trái/ảnh bị mirror hoặc góc nhìn đối diện: model có thể đảo keypoint giải phẫu left_* ↔ right_*. Vì vậy cần flip_idx giải phẫu đúng và tập val có đủ cả hai hướng.",
+    "Q11": "Hai kiểu lỗi tôi thấy từ chính lần chạy:\n1) Có dấu hiệu đảo trái/phải ở 4 ảnh; ví dụ Frame_170.jpg. Cách khắc phục là giữ flip_idx giải phẫu đúng, bổ sung ảnh cả hai hướng và augmentation mirror có hoán đổi nhãn.\n2) Keypoint có sai số chuẩn hoá trung bình lớn nhất là right_front_paw; ảnh Frame_72.jpg là một ca lỗi mạnh ở điểm này. Đây là lỗi định vị keypoint cục bộ, thường nặng hơn khi điểm bị che hoặc hình dạng mơ hồ; nên tăng dữ liệu/annotation cho keypoint đó, dùng augmentation occlusion vừa phải và chỉ sử dụng dự đoán khi confidence đủ cao.\nSáu ảnh tệ nhất được dùng để đối chiếu là: Frame_31.jpg, Frame_54.jpg, Frame_51.jpg, Frame_67.jpg, Frame_17.jpg, Frame_65.jpg.",
+    "Q12": "Dùng cùng sigma = 1/12 cho cả 12 keypoint chỉ là mặc định tiện lợi, không phản ánh việc mũi có thể được định vị rất nhất quán còn gốc đuôi/hock có thể mơ hồ hơn do lông, tư thế hoặc che khuất. Vì OKS dùng sigma để quyết định mức dung sai, sigma đồng nhất có thể phạt quá mạnh keypoint mơ hồ hoặc quá nhẹ keypoint rõ.\nVới dataset custom, tôi sẽ cho nhiều annotator gán cùng một tập ảnh, đo khoảng cách giữa các annotation của từng keypoint sau khi chuẩn hoá theo sqrt(diện tích object), rồi ước lượng độ phân tán riêng cho từng keypoint (có thể dùng std hoặc thống kê robust như median/MAD). Sau đó kiểm tra các sigma này trên validation và giữ cách định nghĩa nhất quán với metric/training."
+  },
+  "env": {
+    "device": "cuda",
+    "torch": "2.11.0+cu130",
+    "ultralytics": "8.4.171"
+  }
+}
